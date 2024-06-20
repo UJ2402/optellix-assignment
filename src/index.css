@@ -1,0 +1,30 @@
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+.sidebar {
+  width: 30%;
+  background-color: #f0f0f0;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.landmark-button {
+  margin-bottom: 10px;
+  padding: 10px;
+  border: none;
+  background-color: #e0e0e0;
+  cursor: pointer;
+}
+
+.landmark-button.active {
+  background-color: #000;
+  color: #fff;
+}
+
+.canvas-container {
+  flex: 1;
+  height: 100%;
+}
