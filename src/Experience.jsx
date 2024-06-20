@@ -3,7 +3,10 @@ import { useLoader, useThree } from "@react-three/fiber";
 import React, { useEffect, useRef, useState } from "react";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
 import * as THREE from "three";
-
+const calculatePerpendicularVector = (v1, v2, planeNormal) => {
+  const lineVector = new THREE.Vector3().subVectors(v2, v1);
+  return new THREE.Vector3().crossVectors(lineVector, planeNormal).normalize();
+};
 const Experience = ({
   selectedPoint,
   onPointPlace,
@@ -71,27 +74,89 @@ const Experience = ({
         .filter(Boolean);
 
       setLines(createdLines);
-      if (placedPoints["Femur Center"] && placedPoints["Hip Center"]) {
+      if (
+        placedPoints["Femur Center"] &&
+        placedPoints["Hip Center"] &&
+        placedPoints["Medial Epicondyle"] &&
+        placedPoints["Lateral Epicondyle"]
+      ) {
         const femurCenter = placedPoints["Femur Center"];
         const hipCenter = placedPoints["Hip Center"];
-        const direction = new THREE.Vector3()
+        const medialEpicondyle = placedPoints["Medial Epicondyle"];
+        const lateralEpicondyle = placedPoints["Lateral Epicondyle"];
+        // Calculate plane normal
+        const planeNormal = new THREE.Vector3()
           .subVectors(hipCenter, femurCenter)
           .normalize();
-        const planeGeometry = new THREE.PlaneGeometry(1, 1);
+
+        // Create plane
+        const planeGeometry = new THREE.PlaneGeometry(5, 5);
         const plane = new THREE.Mesh(
           planeGeometry,
           new THREE.MeshStandardMaterial({
             color: "blue",
             side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.5,
           })
         );
         plane.position.copy(femurCenter);
         plane.lookAt(hipCenter);
         setPlane(plane);
-        
+
+        // Project points onto plane
+        const projectPointOntoPlane = (point) => {
+          const ray = new THREE.Ray(point, planeNormal.clone().negate());
+
+          const planeMath = new THREE.Plane().setFromNormalAndCoplanarPoint(
+            planeNormal,
+            femurCenter
+          );
+
+          // Calculate the intersection
+          const target = new THREE.Vector3();
+          ray.intersectPlane(planeMath, target);
+
+          if (!target) {
+            console.warn("No intersection found for point:", point);
+            return null;
+          }
+
+          return target;
+        };
+
+        const projectedMedial = projectPointOntoPlane(medialEpicondyle);
+        const projectedLateral = projectPointOntoPlane(lateralEpicondyle);
+
+        // Add projected line
+        setLines((prevLines) => [
+          ...prevLines,
+          [projectedMedial, projectedLateral],
+        ]);
+        if (projectedMedial && projectedLateral) {
+          const perpVector = calculatePerpendicularVector(
+            projectedMedial,
+            projectedLateral,
+            planeNormal
+          );
+
+          perpVector.multiplyScalar(-0.1);
+
+          // Add this vector to femur center to get the new point
+          const anteriorPoint = new THREE.Vector3().addVectors(
+            femurCenter,
+            perpVector
+          );
+
+          // Add new line from femur center to anterior point
+          setLines((prevLines) => [...prevLines, [femurCenter, anteriorPoint]]);
+
+          // Optionally, add the new point to placedPoints
+        //   onPointPlace("Anterior Point", anteriorPoint);
+        }
       }
     }
-  }, [updateClicked, placedPoints]);
+  }, [updateClicked, placedPoints, onPointPlace]);
 
   const handleClick = () => {
     if (!selectedPoint || !hoverPoint) return;
@@ -110,7 +175,6 @@ const Experience = ({
         rotation={[-Math.PI / 2, 0, 0]}
         castShadow
         onClick={handleClick}
-        
       >
         <meshStandardMaterial wireframe opacity={0} color="white" />
       </mesh>

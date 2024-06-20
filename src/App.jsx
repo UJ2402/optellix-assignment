@@ -54,7 +54,12 @@ const App = () => {
         <button onClick={handleUpdateClick}>Update</button>
       </div>
       <div className="canvas-container">
-        <Canvas>
+        <Canvas
+            camera={{
+              fov: 45,
+              near: 0.1,
+              far: 200000,
+            }}>
           <Experience
             selectedPoint={selectedPoint}
             placedPoints={placedPoints}
