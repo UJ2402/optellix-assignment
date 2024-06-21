@@ -12,6 +12,7 @@ const Experience = ({
   onPointPlace,
   placedPoints,
   updateClicked,
+  varusValgusAngle,
 }) => {
   const bone1 = useLoader(STLLoader, "/Right_Femur.stl");
   const bone2 = useLoader(STLLoader, "/Right_Tibia.stl");
@@ -20,6 +21,9 @@ const Experience = ({
   const [hoverPoint, setHoverPoint] = useState(null);
   const [lines, setLines] = useState([]);
   const [plane, setPlane] = useState(null);
+  const [varusValgusPlane, setVarusValgusPlane] = useState(null);
+  const [anteriorLine, setAnteriorLine] = useState(null);
+  const perpendicularPlaneRef = useRef(null);  // Add this line
 
   useEffect(() => {
     const renderer = new THREE.WebGLRenderer();
@@ -91,7 +95,7 @@ const Experience = ({
 
         // Create plane
         const planeGeometry = new THREE.PlaneGeometry(5, 5);
-        const plane = new THREE.Mesh(
+        const perpendicularPlane = new THREE.Mesh(
           planeGeometry,
           new THREE.MeshStandardMaterial({
             color: "blue",
@@ -100,9 +104,22 @@ const Experience = ({
             opacity: 0.5,
           })
         );
-        plane.position.copy(femurCenter);
-        plane.lookAt(hipCenter);
-        setPlane(plane);
+        perpendicularPlane.position.copy(femurCenter);
+        perpendicularPlane.lookAt(hipCenter);
+
+
+        setPlane(perpendicularPlane);
+        perpendicularPlaneRef.current = perpendicularPlane;  // Store reference
+
+        const varusValgusPlane = perpendicularPlane.clone();
+        // console.log(varusValgusPlane.rotation._x);
+        // varusValgusPlane.rotation._x = Math.PI * 0.2;
+        varusValgusPlane.rotation.copy(perpendicularPlane.rotation);  // Copy rotation
+
+        varusValgusPlane.material = perpendicularPlane.material.clone();
+        varusValgusPlane.material.color.setHex(0xff0000); // Set color to red
+        setVarusValgusPlane(varusValgusPlane);
+        console.log(varusValgusPlane.rotation,perpendicularPlane.rotation)
 
         // Project points onto plane
         const projectPointOntoPlane = (point) => {
@@ -142,22 +159,46 @@ const Experience = ({
 
           perpVector.multiplyScalar(-0.1);
 
-          // Add this vector to femur center to get the new point
+          // Add to femur center to get the new point
           const anteriorPoint = new THREE.Vector3().addVectors(
             femurCenter,
             perpVector
           );
 
-          // Add new line from femur center to anterior point
-          setLines((prevLines) => [...prevLines, [femurCenter, anteriorPoint]]);
+          setLines((prevLines) => [...prevLines, [femurCenter, anteriorPoint]]); // anterior line from femur
+          setAnteriorLine([femurCenter, anteriorPoint]);
 
           // Optionally, add the new point to placedPoints
-        //   onPointPlace("Anterior Point", anteriorPoint);
+            // onPointPlace("Anterior Point", anteriorPoint);
         }
       }
     }
   }, [updateClicked, placedPoints, onPointPlace]);
+  useEffect(() => {
+    if (varusValgusPlane && anteriorLine && perpendicularPlaneRef.current) {
+      const [start, end] = anteriorLine;
+      const axis = new THREE.Vector3().subVectors(end, start).normalize();
+      varusValgusPlane.position.copy(start);
 
+      // Use the stored reference to get the initial rotation
+      const initialRotation = new THREE.Quaternion().setFromEuler(perpendicularPlaneRef.current.rotation);
+
+      // Create a rotation quaternion for the varus/valgus angle
+      const varusValgusRotation = new THREE.Quaternion().setFromAxisAngle(
+        axis,
+        varusValgusAngle
+      );
+
+      // Combine the initial rotation with the varus/valgus rotation
+      const finalRotation = new THREE.Quaternion().multiplyQuaternions(
+        varusValgusRotation,
+        initialRotation
+      );
+
+      // Apply the final rotation
+      varusValgusPlane.setRotationFromQuaternion(finalRotation);
+    }
+  }, [varusValgusAngle, varusValgusPlane, anteriorLine]);
   const handleClick = () => {
     if (!selectedPoint || !hoverPoint) return;
     onPointPlace(selectedPoint, hoverPoint);
@@ -178,7 +219,7 @@ const Experience = ({
       >
         <meshStandardMaterial wireframe opacity={0} color="white" />
       </mesh>
-      <mesh
+      {/* <mesh
         geometry={bone2}
         scale={0.01}
         position={[0, -7, 0]}
@@ -186,7 +227,7 @@ const Experience = ({
         castShadow
       >
         <meshStandardMaterial color="red" />
-      </mesh>
+      </mesh> */}
       {Object.entries(placedPoints).map(([point, position]) => (
         <mesh key={point} position={position}>
           <sphereGeometry args={[0.01, 32, 32]} />
@@ -201,6 +242,8 @@ const Experience = ({
           )}
         </mesh>
       ))}
+      {plane && <primitive object={plane} />}
+      {varusValgusPlane && <primitive object={varusValgusPlane} />}
       {hoverPoint && (
         <mesh position={hoverPoint}>
           <sphereGeometry args={[0.01, 32, 32]} />
