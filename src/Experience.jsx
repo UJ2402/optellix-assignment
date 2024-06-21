@@ -31,6 +31,36 @@ const Experience = ({
   const [lateralLine, setLateralLine] = useState(null);
   const [flexionExtensionPlane, setFlexionExtensionPlane] = useState(null);
   const [distalMedialPlane, setDistalMedialPlane] = useState(null);
+  const [distalResectionPlane, setDistalResectionPlane] = useState(null);
+
+  useEffect(() => {
+    if (distalMedialPlane && flexionExtensionPlane) {
+      const planeGeometry = new THREE.PlaneGeometry(5, 5);
+      const newDistalResectionPlane = new THREE.Mesh(
+        planeGeometry,
+        new THREE.MeshStandardMaterial({
+          color: "black",
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.5,
+        })
+      );
+
+      // Copy rotation and position from distal medial plane
+      newDistalResectionPlane.rotation.copy(distalMedialPlane.rotation);
+      newDistalResectionPlane.position.copy(distalMedialPlane.position);
+
+      // Calculate the normal vector of the plane
+      const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(
+        flexionExtensionPlane.quaternion
+      );
+
+      // Move the plane 10mm (0.01 in our scale) in the proximal direction
+      newDistalResectionPlane.position.add(normal.multiplyScalar(0.01));
+
+      setDistalResectionPlane(newDistalResectionPlane);
+    }
+  }, [distalMedialPlane, flexionExtensionPlane]);
 
   useEffect(() => {
     const renderer = new THREE.WebGLRenderer();
@@ -163,7 +193,7 @@ const Experience = ({
             planeNormal
           );
 
-          perpVector.multiplyScalar(-0.1);
+          perpVector.multiplyScalar(-0.01);
 
           const anteriorPoint = new THREE.Vector3().addVectors(
             femurCenter,
@@ -301,7 +331,7 @@ const Experience = ({
 
       const endPoint = new THREE.Vector3().addVectors(
         projectedFemurCenter,
-        perpendicularDirection.multiplyScalar(1)
+        perpendicularDirection.multiplyScalar(0.01)
       );
 
       if (projectedFemurCenter && endPoint) {
@@ -318,6 +348,8 @@ const Experience = ({
 
   return (
     <>
+          <OrbitControls />
+
       <gridHelper />
       <axesHelper />
       <mesh
@@ -358,7 +390,7 @@ const Experience = ({
         <Line key={index} points={line} color="green" lineWidth={5} />
       ))}
       {distalMedialPlane && <primitive object={distalMedialPlane} />}
-
+      {distalResectionPlane && <primitive object={distalResectionPlane} />}
       {flexionExtensionPlane && <primitive object={flexionExtensionPlane} />}
       {projectedAnteriorLine && (
         <Line points={projectedAnteriorLine} color="yellow" lineWidth={5} />

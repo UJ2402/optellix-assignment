@@ -76,7 +76,6 @@ const App = () => {
             varusValgusAngle={varusValgusAngle}
             extensionAngle={extensionAngle}
           />
-          <OrbitControls />
         </Canvas>
       </div>
     </div>
