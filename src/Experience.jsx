@@ -3,16 +3,19 @@ import { useLoader, useThree } from "@react-three/fiber";
 import React, { useEffect, useRef, useState } from "react";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
 import * as THREE from "three";
+
 const calculatePerpendicularVector = (v1, v2, planeNormal) => {
   const lineVector = new THREE.Vector3().subVectors(v2, v1);
   return new THREE.Vector3().crossVectors(lineVector, planeNormal).normalize();
 };
+
 const Experience = ({
   selectedPoint,
   onPointPlace,
   placedPoints,
   updateClicked,
   varusValgusAngle,
+  extensionAngle,
 }) => {
   const bone1 = useLoader(STLLoader, "/Right_Femur.stl");
   const bone2 = useLoader(STLLoader, "/Right_Tibia.stl");
@@ -23,7 +26,11 @@ const Experience = ({
   const [plane, setPlane] = useState(null);
   const [varusValgusPlane, setVarusValgusPlane] = useState(null);
   const [anteriorLine, setAnteriorLine] = useState(null);
-  const perpendicularPlaneRef = useRef(null);  // Add this line
+  const perpendicularPlaneRef = useRef(null);
+  const [projectedAnteriorLine, setProjectedAnteriorLine] = useState(null);
+  const [lateralLine, setLateralLine] = useState(null);
+  const [flexionExtensionPlane, setFlexionExtensionPlane] = useState(null);
+  const [distalMedialPlane, setDistalMedialPlane] = useState(null);
 
   useEffect(() => {
     const renderer = new THREE.WebGLRenderer();
@@ -78,6 +85,7 @@ const Experience = ({
         .filter(Boolean);
 
       setLines(createdLines);
+
       if (
         placedPoints["Femur Center"] &&
         placedPoints["Hip Center"] &&
@@ -88,12 +96,11 @@ const Experience = ({
         const hipCenter = placedPoints["Hip Center"];
         const medialEpicondyle = placedPoints["Medial Epicondyle"];
         const lateralEpicondyle = placedPoints["Lateral Epicondyle"];
-        // Calculate plane normal
+
         const planeNormal = new THREE.Vector3()
           .subVectors(hipCenter, femurCenter)
           .normalize();
 
-        // Create plane
         const planeGeometry = new THREE.PlaneGeometry(5, 5);
         const perpendicularPlane = new THREE.Mesh(
           planeGeometry,
@@ -107,30 +114,29 @@ const Experience = ({
         perpendicularPlane.position.copy(femurCenter);
         perpendicularPlane.lookAt(hipCenter);
 
-
         setPlane(perpendicularPlane);
-        perpendicularPlaneRef.current = perpendicularPlane;  // Store reference
+        perpendicularPlaneRef.current = perpendicularPlane;
 
         const varusValgusPlane = perpendicularPlane.clone();
-        // console.log(varusValgusPlane.rotation._x);
-        // varusValgusPlane.rotation._x = Math.PI * 0.2;
-        varusValgusPlane.rotation.copy(perpendicularPlane.rotation);  // Copy rotation
-
+        varusValgusPlane.rotation.copy(perpendicularPlane.rotation);
         varusValgusPlane.material = perpendicularPlane.material.clone();
-        varusValgusPlane.material.color.setHex(0xff0000); // Set color to red
+        varusValgusPlane.material.color.setHex(0xff0000);
         setVarusValgusPlane(varusValgusPlane);
-        console.log(varusValgusPlane.rotation,perpendicularPlane.rotation)
 
-        // Project points onto plane
+        if (varusValgusPlane) {
+          const flexionExtensionPlane = varusValgusPlane.clone();
+          flexionExtensionPlane.rotation.copy(varusValgusPlane.rotation);
+          flexionExtensionPlane.material = varusValgusPlane.material.clone();
+          flexionExtensionPlane.material.color.setHex(0x00ff00);
+          setFlexionExtensionPlane(flexionExtensionPlane);
+        }
+
         const projectPointOntoPlane = (point) => {
           const ray = new THREE.Ray(point, planeNormal.clone().negate());
-
           const planeMath = new THREE.Plane().setFromNormalAndCoplanarPoint(
             planeNormal,
             femurCenter
           );
-
-          // Calculate the intersection
           const target = new THREE.Vector3();
           ray.intersectPlane(planeMath, target);
 
@@ -145,12 +151,12 @@ const Experience = ({
         const projectedMedial = projectPointOntoPlane(medialEpicondyle);
         const projectedLateral = projectPointOntoPlane(lateralEpicondyle);
 
-        // Add projected line
-        setLines((prevLines) => [
-          ...prevLines,
-          [projectedMedial, projectedLateral],
-        ]);
         if (projectedMedial && projectedLateral) {
+          setLines((prevLines) => [
+            ...prevLines,
+            [projectedMedial, projectedLateral],
+          ]);
+
           const perpVector = calculatePerpendicularVector(
             projectedMedial,
             projectedLateral,
@@ -159,46 +165,152 @@ const Experience = ({
 
           perpVector.multiplyScalar(-0.1);
 
-          // Add to femur center to get the new point
           const anteriorPoint = new THREE.Vector3().addVectors(
             femurCenter,
             perpVector
           );
 
-          setLines((prevLines) => [...prevLines, [femurCenter, anteriorPoint]]); // anterior line from femur
+          setLines((prevLines) => [...prevLines, [femurCenter, anteriorPoint]]);
           setAnteriorLine([femurCenter, anteriorPoint]);
-
-          // Optionally, add the new point to placedPoints
-            // onPointPlace("Anterior Point", anteriorPoint);
         }
       }
     }
   }, [updateClicked, placedPoints, onPointPlace]);
+
   useEffect(() => {
-    if (varusValgusPlane && anteriorLine && perpendicularPlaneRef.current) {
+    if (
+      flexionExtensionPlane &&
+      lateralLine &&
+      lateralLine.length === 2 &&
+      perpendicularPlaneRef.current &&
+      placedPoints["Femur Center"]
+    ) {
+      const [start, end] = lateralLine;
+      console.log(lateralLine);
+      if (!start || !end) return;
+
+      const axis = new THREE.Vector3().subVectors(end, start).normalize();
+      flexionExtensionPlane.position.copy(start);
+
+      const initialRotation = new THREE.Quaternion().setFromEuler(
+        perpendicularPlaneRef.current.rotation
+      );
+
+      const flexionExtensionRotation = new THREE.Quaternion().setFromAxisAngle(
+        axis,
+        extensionAngle
+      );
+
+      const finalRotation = new THREE.Quaternion().multiplyQuaternions(
+        flexionExtensionRotation,
+        initialRotation
+      );
+
+      flexionExtensionPlane.setRotationFromQuaternion(finalRotation);
+    }
+  }, [extensionAngle, flexionExtensionPlane, lateralLine, placedPoints]);
+
+  useEffect(() => {
+    if (
+      flexionExtensionPlane &&
+      placedPoints["Distal Medial Pt"] &&
+      lateralLine &&
+      lateralLine.length === 2
+    ) {
+      const distalMedialPoint = placedPoints["Distal Medial Pt"];
+      const [start, end] = lateralLine;
+
+      const planeGeometry = new THREE.PlaneGeometry(5, 5);
+      const newDistalMedialPlane = new THREE.Mesh(
+        planeGeometry,
+        new THREE.MeshStandardMaterial({
+          color: "purple",
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.5,
+        })
+      );
+
+      newDistalMedialPlane.rotation.copy(flexionExtensionPlane.rotation);
+      newDistalMedialPlane.position.copy(distalMedialPoint);
+
+      const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(
+        flexionExtensionPlane.quaternion
+      );
+      newDistalMedialPlane.lookAt(
+        newDistalMedialPlane.position.clone().add(normal)
+      );
+
+      setDistalMedialPlane(newDistalMedialPlane);
+    }
+  }, [flexionExtensionPlane, placedPoints, lateralLine]);
+  useEffect(() => {
+    if (
+      varusValgusPlane &&
+      anteriorLine &&
+      anteriorLine.length === 2 &&
+      perpendicularPlaneRef.current &&
+      placedPoints["Femur Center"]
+    ) {
       const [start, end] = anteriorLine;
+      if (!start || !end) return;
+
       const axis = new THREE.Vector3().subVectors(end, start).normalize();
       varusValgusPlane.position.copy(start);
 
-      // Use the stored reference to get the initial rotation
-      const initialRotation = new THREE.Quaternion().setFromEuler(perpendicularPlaneRef.current.rotation);
+      const initialRotation = new THREE.Quaternion().setFromEuler(
+        perpendicularPlaneRef.current.rotation
+      );
 
-      // Create a rotation quaternion for the varus/valgus angle
       const varusValgusRotation = new THREE.Quaternion().setFromAxisAngle(
         axis,
         varusValgusAngle
       );
 
-      // Combine the initial rotation with the varus/valgus rotation
       const finalRotation = new THREE.Quaternion().multiplyQuaternions(
         varusValgusRotation,
         initialRotation
       );
 
-      // Apply the final rotation
       varusValgusPlane.setRotationFromQuaternion(finalRotation);
+
+      const planeNormal = new THREE.Vector3(0, 0, 1).applyQuaternion(
+        finalRotation
+      );
+      const projectPointOntoPlane = (point) => {
+        const v = new THREE.Vector3().subVectors(point, start);
+        const dist = v.dot(planeNormal);
+        return new THREE.Vector3().addVectors(
+          point,
+          planeNormal.clone().multiplyScalar(-dist)
+        );
+      };
+
+      const projectedStart = projectPointOntoPlane(start);
+      const projectedEnd = projectPointOntoPlane(end);
+      const projectedDirection = new THREE.Vector3()
+        .subVectors(projectedEnd, projectedStart)
+        .normalize();
+
+      const perpendicularDirection = new THREE.Vector3()
+        .crossVectors(planeNormal, projectedDirection)
+        .normalize();
+
+      const femurCenter = placedPoints["Femur Center"];
+      const projectedFemurCenter = projectPointOntoPlane(femurCenter);
+
+      const endPoint = new THREE.Vector3().addVectors(
+        projectedFemurCenter,
+        perpendicularDirection.multiplyScalar(1)
+      );
+
+      if (projectedFemurCenter && endPoint) {
+        setLateralLine([projectedFemurCenter, endPoint]);
+      }
+      setProjectedAnteriorLine([projectedStart, projectedEnd]);
     }
-  }, [varusValgusAngle, varusValgusPlane, anteriorLine]);
+  }, [varusValgusAngle, varusValgusPlane, anteriorLine, placedPoints]);
+
   const handleClick = () => {
     if (!selectedPoint || !hoverPoint) return;
     onPointPlace(selectedPoint, hoverPoint);
@@ -219,15 +331,6 @@ const Experience = ({
       >
         <meshStandardMaterial wireframe opacity={0} color="white" />
       </mesh>
-      {/* <mesh
-        geometry={bone2}
-        scale={0.01}
-        position={[0, -7, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        castShadow
-      >
-        <meshStandardMaterial color="red" />
-      </mesh> */}
       {Object.entries(placedPoints).map(([point, position]) => (
         <mesh key={point} position={position}>
           <sphereGeometry args={[0.01, 32, 32]} />
@@ -243,6 +346,7 @@ const Experience = ({
         </mesh>
       ))}
       {plane && <primitive object={plane} />}
+      {lateralLine && <Line points={lateralLine} color="white" lineWidth={5} />}
       {varusValgusPlane && <primitive object={varusValgusPlane} />}
       {hoverPoint && (
         <mesh position={hoverPoint}>
@@ -253,7 +357,12 @@ const Experience = ({
       {lines.map((line, index) => (
         <Line key={index} points={line} color="green" lineWidth={5} />
       ))}
-      {plane && <primitive object={plane} />}
+      {distalMedialPlane && <primitive object={distalMedialPlane} />}
+
+      {flexionExtensionPlane && <primitive object={flexionExtensionPlane} />}
+      {projectedAnteriorLine && (
+        <Line points={projectedAnteriorLine} color="yellow" lineWidth={5} />
+      )}
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} castShadow />
       <directionalLight

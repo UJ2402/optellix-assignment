@@ -10,6 +10,8 @@ const App = () => {
   const [placedPoints, setPlacedPoints] = useState({});
   const [updateClicked, setUpdateClicked] = useState(false);
   const [varusValgusAngle, setVarusValgusAngle] = useState(0);
+  const [extensionAngle, setExtensionAngle] = useState(0);
+
 
   const handlePointSelect = (point) => {
     setSelectedPoint((prevPoint) => (prevPoint === point ? null : point));
@@ -30,6 +32,9 @@ const App = () => {
     setVarusValgusAngle((prevAngle) => prevAngle + direction * Math.PI / 180); // Rotate by 1 degree
   };
 
+  const handleExtensionRotation = (direction) => {
+    setExtensionAngle((prevAngle) => prevAngle + direction * Math.PI / 180); // Rotate by 1 degree
+  };
   const landmarks = [
     "Femur Center",
     "Hip Center",
@@ -58,6 +63,8 @@ const App = () => {
         <button onClick={handleUpdateClick}>Update</button>
         <button onClick={() => handleVarusValgusRotation(1)}>Varus (+)</button>
         <button onClick={() => handleVarusValgusRotation(-1)}>Valgus (-)</button>
+        <button onClick={() => handleExtensionRotation(1)}>Extension (+)</button>
+        <button onClick={() => handleExtensionRotation(-1)}>Extension (-)</button>
       </div>
       <div className="canvas-container">
         <Canvas camera={{ fov: 45, near: 0.1, far: 200000 }}>
@@ -67,6 +74,7 @@ const App = () => {
             onPointPlace={handlePointPlace}
             updateClicked={updateClicked}
             varusValgusAngle={varusValgusAngle}
+            extensionAngle={extensionAngle}
           />
           <OrbitControls />
         </Canvas>
