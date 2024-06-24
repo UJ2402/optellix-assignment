@@ -1,8 +1,24 @@
-import { OrbitControls, TransformControls, Line } from "@react-three/drei";
+import {
+  OrbitControls,
+  TransformControls,
+  Line,
+  useGLTF,
+} from "@react-three/drei";
 import { useLoader, useThree } from "@react-three/fiber";
 import React, { useEffect, useRef, useState } from "react";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
 import * as THREE from "three";
+import { Perf } from "r3f-perf";
+import {
+  BoxGeometry,
+  BufferGeometry,
+  Mesh,
+  MeshStandardMaterial,
+  SphereGeometry,
+} from "three";
+import { Addition, Base, Geometry, Subtraction } from "@react-three/csg";
+import { useControls } from "leva";
+import { createCuttingGeometry } from "./cuttingGeometry";
 
 const calculatePerpendicularVector = (v1, v2, planeNormal) => {
   const lineVector = new THREE.Vector3().subVectors(v2, v1);
@@ -16,9 +32,12 @@ const Experience = ({
   updateClicked,
   varusValgusAngle,
   extensionAngle,
+  resectionOn,
+  distalResectionDistance,
 }) => {
   const bone1 = useLoader(STLLoader, "/Right_Femur.stl");
   const bone2 = useLoader(STLLoader, "/Right_Tibia.stl");
+  const { nodes } = useGLTF("/Femur.glb");
   const femurRef = useRef();
   const { camera, gl } = useThree();
   const [hoverPoint, setHoverPoint] = useState(null);
@@ -32,6 +51,26 @@ const Experience = ({
   const [flexionExtensionPlane, setFlexionExtensionPlane] = useState(null);
   const [distalMedialPlane, setDistalMedialPlane] = useState(null);
   const [distalResectionPlane, setDistalResectionPlane] = useState(null);
+  const [geometryLoaded, setGeometryLoaded] = useState(false);
+  const {
+    PerpendicularPlane,
+    VarusValgusPlane,
+    FlexionExtensionPlane,
+    DistalMedialPlane,
+    DistalResectionPlane,
+  } = useControls("Plane Visibility", {
+    PerpendicularPlane: true,
+    VarusValgusPlane: true,
+    FlexionExtensionPlane: true,
+    DistalMedialPlane: true,
+    DistalResectionPlane: true,
+  });
+
+  useEffect(() => {
+    if (nodes.Right_Femur?.geometry) {
+      setGeometryLoaded(true);
+    }
+  }, [nodes.Right_Femur]);
 
   useEffect(() => {
     if (distalMedialPlane && flexionExtensionPlane) {
@@ -39,24 +78,26 @@ const Experience = ({
       const newDistalResectionPlane = new THREE.Mesh(
         planeGeometry,
         new THREE.MeshStandardMaterial({
-          color: "black",
+          color: "yellow",
           side: THREE.DoubleSide,
           transparent: true,
           opacity: 0.5,
         })
       );
 
-      // Copy rotation and position from distal medial plane
       newDistalResectionPlane.rotation.copy(distalMedialPlane.rotation);
       newDistalResectionPlane.position.copy(distalMedialPlane.position);
 
-      // Calculate the normal vector of the plane
       const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(
         flexionExtensionPlane.quaternion
       );
 
-      // Move the plane 10mm (0.01 in our scale) in the proximal direction
-      newDistalResectionPlane.position.add(normal.multiplyScalar(0.01));
+      newDistalResectionPlane.position.add(
+        normal.multiplyScalar(0.01 * distalResectionDistance)
+      );
+
+      // Store the normal vector with the plane
+      newDistalResectionPlane.userData.normal = normal;
 
       setDistalResectionPlane(newDistalResectionPlane);
     }
@@ -216,7 +257,6 @@ const Experience = ({
       placedPoints["Femur Center"]
     ) {
       const [start, end] = lateralLine;
-      console.log(lateralLine);
       if (!start || !end) return;
 
       const axis = new THREE.Vector3().subVectors(end, start).normalize();
@@ -274,6 +314,7 @@ const Experience = ({
       setDistalMedialPlane(newDistalMedialPlane);
     }
   }, [flexionExtensionPlane, placedPoints, lateralLine]);
+
   useEffect(() => {
     if (
       varusValgusPlane &&
@@ -331,7 +372,7 @@ const Experience = ({
 
       const endPoint = new THREE.Vector3().addVectors(
         projectedFemurCenter,
-        perpendicularDirection.multiplyScalar(0.01)
+        perpendicularDirection.multiplyScalar(0.1)
       );
 
       if (projectedFemurCenter && endPoint) {
@@ -348,21 +389,65 @@ const Experience = ({
 
   return (
     <>
-          <OrbitControls />
+      {/* <Perf /> */}
+      <OrbitControls makeDefault />
+      {/* <gridHelper />
+      <axesHelper /> */}
 
-      <gridHelper />
-      <axesHelper />
-      <mesh
-        ref={femurRef}
-        geometry={bone1}
-        scale={0.01}
-        position={[0, -7, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        castShadow
-        onClick={handleClick}
-      >
-        <meshStandardMaterial wireframe opacity={0} color="white" />
-      </mesh>
+      <group key={resectionOn ? "resection" : "normal"}>
+        {resectionOn && nodes.Right_Femur?.geometry ? (
+          <mesh receiveShadow castShadow>
+            <Geometry useGroups>
+              <Base
+                geometry={nodes.Right_Femur.geometry}
+                position={[0, -7, 0]}
+                scale={[0.01, 0.01, 0.01]}
+              >
+                <meshStandardMaterial transparent opacity={0.5} color="blue" />
+              </Base>
+              <Subtraction
+                position={distalResectionPlane.position}
+                rotation={distalResectionPlane.rotation}
+              >
+                <primitive
+                  object={createCuttingGeometry(
+                    distalResectionPlane,
+                    5,
+                    1,
+                    placedPoints["Femur Center"]
+                  )}
+                />
+                <meshStandardMaterial
+                  transparent
+                  opacity={0.8}
+                  side={THREE.DoubleSide}
+                  color="red"
+                />
+              </Subtraction>
+            </Geometry>
+          </mesh>
+        ) : (
+          <mesh
+            ref={femurRef}
+            geometry={bone1}
+            scale={0.01}
+            position={[0, -7, 0]}
+            rotation={[-Math.PI / 2, 0, 0]}
+            castShadow
+            onClick={handleClick}
+          >
+            <meshStandardMaterial transparent opacity={0.5} color="blue" />
+          </mesh>
+        )}
+      </group>
+
+      {hoverPoint && (
+        <mesh position={hoverPoint}>
+          <sphereGeometry args={[0.01, 32, 32]} />
+          <meshStandardMaterial color="blue" />
+        </mesh>
+      )}
+
       {Object.entries(placedPoints).map(([point, position]) => (
         <mesh key={point} position={position}>
           <sphereGeometry args={[0.01, 32, 32]} />
@@ -377,24 +462,37 @@ const Experience = ({
           )}
         </mesh>
       ))}
-      {plane && <primitive object={plane} />}
+
+    
+
       {lateralLine && <Line points={lateralLine} color="white" lineWidth={5} />}
-      {varusValgusPlane && <primitive object={varusValgusPlane} />}
-      {hoverPoint && (
-        <mesh position={hoverPoint}>
-          <sphereGeometry args={[0.01, 32, 32]} />
-          <meshStandardMaterial color="blue" />
-        </mesh>
-      )}
+      
       {lines.map((line, index) => (
-        <Line key={index} points={line} color="green" lineWidth={5} />
+        <Line key={index} points={line} color="green" lineWidth={2} />
       ))}
-      {distalMedialPlane && <primitive object={distalMedialPlane} />}
-      {distalResectionPlane && <primitive object={distalResectionPlane} />}
-      {flexionExtensionPlane && <primitive object={flexionExtensionPlane} />}
+
       {projectedAnteriorLine && (
-        <Line points={projectedAnteriorLine} color="yellow" lineWidth={5} />
+        <Line points={projectedAnteriorLine} color="yellow" lineWidth={2} />
       )}
+
+      {plane && PerpendicularPlane && <primitive object={plane} />}
+
+      {varusValgusPlane && VarusValgusPlane && (
+        <primitive object={varusValgusPlane} />
+      )}
+
+      {flexionExtensionPlane && FlexionExtensionPlane && (
+        <primitive object={flexionExtensionPlane} />
+      )}
+
+      {distalMedialPlane && DistalMedialPlane && (
+        <primitive object={distalMedialPlane} />
+      )}
+
+      {distalResectionPlane && DistalResectionPlane && (
+        <primitive object={distalResectionPlane} />
+      )}
+
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} castShadow />
       <directionalLight
