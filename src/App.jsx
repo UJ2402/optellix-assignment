@@ -22,6 +22,7 @@ const App = () => {
   const [placedPoints, setPlacedPoints] = useState({});
   const [updateClicked, setUpdateClicked] = useState(false);
   const [varusValgusAngle, setVarusValgusAngle] = useState(0);
+  const [isPointActive, setIsPointActive] = useState(false);
   const [extensionAngle, setExtensionAngle] = useState(0);
   const brush1 = new Brush(new SphereGeometry());
   brush1.updateMatrixWorld();
@@ -34,7 +35,9 @@ const App = () => {
   const [distalResectionDistance, setDistalResectionDistance] = useState(10);
 
   const handlePointSelect = (point) => {
-    setSelectedPoint((prevPoint) => (prevPoint === point ? null : point));
+    const newSelectedPoint = point === selectedPoint ? null : point;
+    setSelectedPoint(newSelectedPoint);
+    setIsPointActive(!!newSelectedPoint);
   };
 
   const handlePointPlace = (point, position) => {
@@ -92,16 +95,16 @@ const App = () => {
           <OrbitControls />
 
           <Experience
-            selectedPoint={selectedPoint}
-            placedPoints={placedPoints}
-            onPointPlace={handlePointPlace}
-            updateClicked={updateClicked}
-            varusValgusAngle={varusValgusAngle}
-            extensionAngle={extensionAngle}
-            resectionOn={resectionOn}
-            distalResectionDistance={distalResectionDistance}
-
-          />
+  selectedPoint={selectedPoint}
+  placedPoints={placedPoints}
+  onPointPlace={handlePointPlace}
+  updateClicked={updateClicked}
+  varusValgusAngle={varusValgusAngle}
+  extensionAngle={extensionAngle}
+  resectionOn={resectionOn}
+  distalResectionDistance={distalResectionDistance}
+  isPointActive={isPointActive}
+/>
           <ambientLight intensity={1} />
           <pointLight position={[10, 10, 10]} castShadow />
         </Canvas>

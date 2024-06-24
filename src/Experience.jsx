@@ -33,6 +33,7 @@ const Experience = ({
   varusValgusAngle,
   extensionAngle,
   resectionOn,
+  isPointActive,
   distalResectionDistance,
 }) => {
   const bone1 = useLoader(STLLoader, "/Right_Femur.stl");
@@ -52,6 +53,14 @@ const Experience = ({
   const [distalMedialPlane, setDistalMedialPlane] = useState(null);
   const [distalResectionPlane, setDistalResectionPlane] = useState(null);
   const [geometryLoaded, setGeometryLoaded] = useState(false);
+  const { boneOpacity, boneColor, anteriorLineLength, lateralLineLength } =
+    useControls("Bone Model", {
+      boneOpacity: { value: 0.5, min: 0, max: 1, step: 0.1 },
+      boneColor: "orange",
+      anteriorLineLength: { value: 10.0, min: 10.0, max: 100.0, step: 0.5 },
+      lateralLineLength: { value: 0.0, min: 10.0, max: 100.0, step: 0.5 },
+    });
+
   const {
     PerpendicularPlane,
     VarusValgusPlane,
@@ -59,13 +68,38 @@ const Experience = ({
     DistalMedialPlane,
     DistalResectionPlane,
   } = useControls("Plane Visibility", {
-    PerpendicularPlane: true,
-    VarusValgusPlane: true,
-    FlexionExtensionPlane: true,
-    DistalMedialPlane: true,
-    DistalResectionPlane: true,
+    PerpendicularPlane: false,
+    VarusValgusPlane: false,
+    FlexionExtensionPlane: false,
+    DistalMedialPlane: false,
+    DistalResectionPlane: false,
   });
 
+  useEffect(() => {
+    if (
+      anteriorLine &&
+      anteriorLine.length === 2 &&
+      placedPoints["Femur Center"]
+    ) {
+      const [start, end] = anteriorLine;
+      const direction = new THREE.Vector3().subVectors(end, start).normalize();
+      const newEnd = new THREE.Vector3().addVectors(
+        start,
+        direction.multiplyScalar(anteriorLineLength * 0.01) // Adjust scale factor as needed
+      );
+      setAnteriorLine([start, newEnd]);
+      setLines((prevLines) => {
+        const newLines = [...prevLines];
+        const anteriorLineIndex = newLines.findIndex(
+          (line) => line[0].equals(start) && line[1].equals(end)
+        );
+        if (anteriorLineIndex !== -1) {
+          newLines[anteriorLineIndex] = [start, newEnd];
+        }
+        return newLines;
+      });
+    }
+  }, [anteriorLineLength, anteriorLine, placedPoints]);
   useEffect(() => {
     if (nodes.Right_Femur?.geometry) {
       setGeometryLoaded(true);
@@ -109,6 +143,11 @@ const Experience = ({
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const handleMouseMove = (event) => {
+      if (!isPointActive || resectionOn) {
+        setHoverPoint(null);
+        return;
+      }
+
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
       const rect = gl.domElement.getBoundingClientRect();
@@ -126,12 +165,14 @@ const Experience = ({
       }
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    if (isPointActive && !resectionOn) {
+      window.addEventListener("mousemove", handleMouseMove);
+    }
 
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
     };
-  }, [camera, gl.domElement]);
+  }, [camera, gl.domElement, isPointActive, resectionOn]);
 
   useEffect(() => {
     if (updateClicked && placedPoints) {
@@ -234,7 +275,7 @@ const Experience = ({
             planeNormal
           );
 
-          perpVector.multiplyScalar(-0.01);
+          perpVector.multiplyScalar(-anteriorLineLength * 0.01); //anterior line length
 
           const anteriorPoint = new THREE.Vector3().addVectors(
             femurCenter,
@@ -246,10 +287,11 @@ const Experience = ({
         }
       }
     }
-  }, [updateClicked, placedPoints, onPointPlace]);
+  }, [updateClicked, placedPoints, onPointPlace, anteriorLineLength]);
 
   useEffect(() => {
     if (
+      varusValgusPlane &&
       flexionExtensionPlane &&
       lateralLine &&
       lateralLine.length === 2 &&
@@ -260,25 +302,34 @@ const Experience = ({
       if (!start || !end) return;
 
       const axis = new THREE.Vector3().subVectors(end, start).normalize();
-      flexionExtensionPlane.position.copy(start);
+      flexionExtensionPlane.position.copy(varusValgusPlane.position);
 
-      const initialRotation = new THREE.Quaternion().setFromEuler(
-        perpendicularPlaneRef.current.rotation
+      // Get the current rotation of the varus valgus plane
+      const varusValgusRotation = new THREE.Quaternion().setFromEuler(
+        varusValgusPlane.rotation
       );
 
-      const flexionExtensionRotation = new THREE.Quaternion().setFromAxisAngle(
+      // Apply the extension angle rotation
+      const extensionRotation = new THREE.Quaternion().setFromAxisAngle(
         axis,
         extensionAngle
       );
 
+      // Combine the rotations
       const finalRotation = new THREE.Quaternion().multiplyQuaternions(
-        flexionExtensionRotation,
-        initialRotation
+        extensionRotation,
+        varusValgusRotation
       );
 
       flexionExtensionPlane.setRotationFromQuaternion(finalRotation);
     }
-  }, [extensionAngle, flexionExtensionPlane, lateralLine, placedPoints]);
+  }, [
+    extensionAngle,
+    flexionExtensionPlane,
+    lateralLine,
+    placedPoints,
+    varusValgusPlane,
+  ]);
 
   useEffect(() => {
     if (
@@ -369,10 +420,9 @@ const Experience = ({
 
       const femurCenter = placedPoints["Femur Center"];
       const projectedFemurCenter = projectPointOntoPlane(femurCenter);
-
       const endPoint = new THREE.Vector3().addVectors(
         projectedFemurCenter,
-        perpendicularDirection.multiplyScalar(0.1)
+        perpendicularDirection.multiplyScalar(lateralLineLength * 0.01) //size of lateral line
       );
 
       if (projectedFemurCenter && endPoint) {
@@ -380,10 +430,16 @@ const Experience = ({
       }
       setProjectedAnteriorLine([projectedStart, projectedEnd]);
     }
-  }, [varusValgusAngle, varusValgusPlane, anteriorLine, placedPoints]);
+  }, [
+    varusValgusAngle,
+    varusValgusPlane,
+    anteriorLine,
+    placedPoints,
+    lateralLineLength,
+  ]);
 
   const handleClick = () => {
-    if (!selectedPoint || !hoverPoint) return;
+    if (!isPointActive || resectionOn || !selectedPoint || !hoverPoint) return;
     onPointPlace(selectedPoint, hoverPoint);
   };
 
@@ -403,7 +459,11 @@ const Experience = ({
                 position={[0, -7, 0]}
                 scale={[0.01, 0.01, 0.01]}
               >
-                <meshStandardMaterial transparent opacity={0.5} color="blue" />
+                <meshStandardMaterial
+                  transparent
+                  opacity={boneOpacity}
+                  color={boneColor}
+                />
               </Base>
               <Subtraction
                 position={distalResectionPlane.position}
@@ -436,7 +496,11 @@ const Experience = ({
             castShadow
             onClick={handleClick}
           >
-            <meshStandardMaterial transparent opacity={0.5} color="blue" />
+            <meshStandardMaterial
+              transparent
+              opacity={boneOpacity}
+              color={boneColor}
+            />
           </mesh>
         )}
       </group>
@@ -463,10 +527,8 @@ const Experience = ({
         </mesh>
       ))}
 
-    
-
       {lateralLine && <Line points={lateralLine} color="white" lineWidth={5} />}
-      
+
       {lines.map((line, index) => (
         <Line key={index} points={line} color="green" lineWidth={2} />
       ))}
