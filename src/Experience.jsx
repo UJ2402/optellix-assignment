@@ -72,18 +72,20 @@ const Experience = ({
   const [geometryLoaded, setGeometryLoaded] = useState(false);
   const [distalMedialDistance, setDistalMedialDistance] = useState(null);
   const [distalLateralDistance, setDistalLateralDistance] = useState(null);
+  const [bone2Visible, setBone2Visible] = useState(true);
   const meshRefs = useRef({});
   const handlePointClick = (point) => {
     setActivePoint(point);
     onPointPlace(point, placedPoints[point]); // This ensures the point is "placed" when clicked
   };
-  const { boneOpacity, boneColor, anteriorLineLength, lateralLineLength } =
-    useControls("Bone Model", {
-      boneOpacity: { value: 0.5, min: 0, max: 1, step: 0.1 },
-      boneColor: "orange",
-      anteriorLineLength: { value: 10.0, min: 10.0, max: 100.0, step: 0.5 },
-      lateralLineLength: { value: 0.0, min: 10.0, max: 100.0, step: 0.5 },
-    });
+  const { boneOpacity, boneColor, anteriorLineLength, lateralLineLength, showBone2 } =
+  useControls("Bone Model", {
+    boneOpacity: { value: 0.5, min: 0, max: 1, step: 0.1 },
+    boneColor: "orange",
+    anteriorLineLength: { value: 10.0, min: 10.0, max: 100.0, step: 0.5 },
+    lateralLineLength: { value: 0.0, min: 10.0, max: 100.0, step: 0.5 },
+    showBone2: { value: true, label: "Show Tibia" },
+  });
   const {
     PerpendicularPlane,
     VarusValgusPlane,
@@ -97,6 +99,9 @@ const Experience = ({
     DistalMedialPlane: false,
     DistalResectionPlane: false,
   });
+  useEffect(() => {
+    setBone2Visible(showBone2);
+  }, [showBone2]);
 
   useEffect(() => {
     if (
@@ -553,19 +558,22 @@ const Experience = ({
           </Text>
         </Billboard>
       )}
-      <mesh
-        geometry={bone2}
-        scale={0.01}
-        position={[0, -7, 0]}
-        rotation={[-Math.PI / 2, 0, 0]}
-        castShadow
-      >
-        <meshStandardMaterial
-          transparent
-          opacity={boneOpacity}
-          color={boneColor}
-        />
-      </mesh>
+      {bone2Visible && (
+  <mesh
+    geometry={bone2}
+    scale={0.01}
+    position={[0, -7, 0]}
+    rotation={[-Math.PI / 2, 0, 0]}
+    castShadow
+  >
+    <meshStandardMaterial
+      transparent
+      opacity={boneOpacity}
+      color={boneColor}
+    />
+  </mesh>
+)}
+
       <group key={resectionOn ? "resection" : "normal"}>
         {resectionOn && nodes.Right_Femur?.geometry ? (
           <mesh receiveShadow castShadow>
