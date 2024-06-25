@@ -11,13 +11,6 @@ import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
 import * as THREE from "three";
 import { Text } from "@react-three/drei";
 import { Perf } from "r3f-perf";
-import {
-  BoxGeometry,
-  BufferGeometry,
-  Mesh,
-  MeshStandardMaterial,
-  SphereGeometry,
-} from "three";
 import { Addition, Base, Geometry, Subtraction } from "@react-three/csg";
     import { useControls } from "leva";
 import { createCuttingGeometry } from "./cuttingGeometry";
@@ -73,10 +66,11 @@ const Experience = ({
   const [distalMedialDistance, setDistalMedialDistance] = useState(null);
   const [distalLateralDistance, setDistalLateralDistance] = useState(null);
   const [bone2Visible, setBone2Visible] = useState(true);
+ 
   const meshRefs = useRef({});
   const handlePointClick = (point) => {
     setActivePoint(point);
-    onPointPlace(point, placedPoints[point]); // This ensures the point is "placed" when clicked
+    onPointPlace(point, placedPoints[point]); 
   };
   const { boneOpacity, boneColor, anteriorLineLength, lateralLineLength, showBone2 } =
   useControls("Bone Model", {
@@ -221,20 +215,20 @@ const Experience = ({
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const handleMouseMove = (event) => {
-      if (!isPointActive || resectionOn) {
+      if (!isPointActive || resectionOn ) {
         setHoverPoint(null);
         return;
       }
-
+    
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
       const rect = gl.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
-
+    
       const intersects = raycaster.intersectObject(femurRef.current);
-
+    
       if (intersects.length > 0) {
         const point = intersects[0].point;
         setHoverPoint(point);
@@ -250,6 +244,7 @@ const Experience = ({
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
     };
+    console.log(hello)
   }, [camera, gl.domElement, isPointActive, resectionOn]);
 
   useEffect(() => {
@@ -518,12 +513,12 @@ const Experience = ({
   const handleClick = () => {
     if (!isPointActive || resectionOn || !selectedPoint || !hoverPoint) return;
     onPointPlace(selectedPoint, hoverPoint);
-    setActivePoint(selectedPoint); // Add this line
+    setActivePoint(selectedPoint); 
   };
 
   return (
     <>
-      {/* <Perf /> */}
+      {/* <Perf  /> */}
       <OrbitControls makeDefault />
       {/* <gridHelper />
       <axesHelper /> */}
@@ -654,14 +649,16 @@ const Experience = ({
               <meshStandardMaterial color={"red"} />
             </mesh>
             {activePoint === point && meshRefs.current[point].current && (
-              <TransformControls
-                object={meshRefs.current[point].current}
-                mode="translate"
-                onObjectChange={(e) => {
-                  const newPosition = e.target.object.position;
-                  onPointPlace(point, newPosition);
-                }}
-              />
+             <TransformControls
+             object={meshRefs.current[point].current}
+             mode="translate"
+             onObjectChange={(e) => {
+               const newPosition = e.target.object.position;
+               onPointPlace(point, newPosition);
+             }}
+             onMouseDown={() => setIsTransformControlActive(true)}
+             onMouseUp={() => setIsTransformControlActive(false)}
+           />
             )}
           </group>
         );
