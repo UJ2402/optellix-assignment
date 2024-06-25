@@ -3,11 +3,13 @@ import {
   TransformControls,
   Line,
   useGLTF,
+  Billboard,
 } from "@react-three/drei";
 import { useLoader, useThree } from "@react-three/fiber";
 import React, { useEffect, useRef, useState } from "react";
 import { STLLoader } from "three/examples/jsm/loaders/STLLoader";
 import * as THREE from "three";
+import { Text } from "@react-three/drei";
 import { Perf } from "r3f-perf";
 import {
   BoxGeometry,
@@ -17,14 +19,27 @@ import {
   SphereGeometry,
 } from "three";
 import { Addition, Base, Geometry, Subtraction } from "@react-three/csg";
-import { useControls } from "leva";
+    import { useControls } from "leva";
 import { createCuttingGeometry } from "./cuttingGeometry";
 
 const calculatePerpendicularVector = (v1, v2, planeNormal) => {
   const lineVector = new THREE.Vector3().subVectors(v2, v1);
   return new THREE.Vector3().crossVectors(lineVector, planeNormal).normalize();
 };
-
+const distanceFromPointToPlane = (point, plane) => {
+  if (!point || !plane || !plane.userData.normal) {
+    console.error("Invalid point or plane for distance calculation", {
+      point,
+      plane,
+    });
+    return null;
+  }
+  const normal = plane.userData.normal;
+  const planePoint = plane.position;
+  const v = new THREE.Vector3().subVectors(point, planePoint);
+  const distance = Math.abs(v.dot(normal));
+  return distance;
+};
 const Experience = ({
   selectedPoint,
   onPointPlace,
@@ -35,6 +50,8 @@ const Experience = ({
   resectionOn,
   isPointActive,
   distalResectionDistance,
+  activePoint,
+  setActivePoint,
 }) => {
   const bone1 = useLoader(STLLoader, "/Right_Femur.stl");
   const bone2 = useLoader(STLLoader, "/Right_Tibia.stl");
@@ -53,6 +70,13 @@ const Experience = ({
   const [distalMedialPlane, setDistalMedialPlane] = useState(null);
   const [distalResectionPlane, setDistalResectionPlane] = useState(null);
   const [geometryLoaded, setGeometryLoaded] = useState(false);
+  const [distalMedialDistance, setDistalMedialDistance] = useState(null);
+  const [distalLateralDistance, setDistalLateralDistance] = useState(null);
+  const meshRefs = useRef({});
+  const handlePointClick = (point) => {
+    setActivePoint(point);
+    onPointPlace(point, placedPoints[point]); // This ensures the point is "placed" when clicked
+  };
   const { boneOpacity, boneColor, anteriorLineLength, lateralLineLength } =
     useControls("Bone Model", {
       boneOpacity: { value: 0.5, min: 0, max: 1, step: 0.1 },
@@ -60,7 +84,6 @@ const Experience = ({
       anteriorLineLength: { value: 10.0, min: 10.0, max: 100.0, step: 0.5 },
       lateralLineLength: { value: 0.0, min: 10.0, max: 100.0, step: 0.5 },
     });
-
   const {
     PerpendicularPlane,
     VarusValgusPlane,
@@ -106,6 +129,56 @@ const Experience = ({
     }
   }, [nodes.Right_Femur]);
 
+  useEffect(() => {}, [placedPoints]);
+  useEffect(() => {
+    if (distalMedialPlane && flexionExtensionPlane) {
+      const planeGeometry = new THREE.PlaneGeometry(5, 5);
+      const newDistalResectionPlane = new THREE.Mesh(
+        planeGeometry,
+        new THREE.MeshStandardMaterial({
+          color: "yellow",
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 0.5,
+        })
+      );
+
+      newDistalResectionPlane.rotation.copy(distalMedialPlane.rotation);
+      newDistalResectionPlane.position.copy(distalMedialPlane.position);
+
+      const normal = new THREE.Vector3(0, 0, 1).applyQuaternion(
+        flexionExtensionPlane.quaternion
+      );
+
+      newDistalResectionPlane.position.add(
+        normal.multiplyScalar(0.01 * distalResectionDistance)
+      );
+
+      // Store the normal vector with the plane
+      newDistalResectionPlane.userData.normal = normal;
+
+      setDistalResectionPlane(newDistalResectionPlane);
+    }
+  }, [distalMedialPlane, flexionExtensionPlane, distalResectionDistance]);
+  useEffect(() => {
+    if (
+      distalResectionPlane &&
+      placedPoints["Distal Medial Pt"] &&
+      placedPoints["Distal Lateral Pt"]
+    ) {
+      const distalMedialDist = distanceFromPointToPlane(
+        placedPoints["Distal Medial Pt"],
+        distalResectionPlane
+      );
+      const distalLateralDist = distanceFromPointToPlane(
+        placedPoints["Distal Lateral Pt"],
+        distalResectionPlane
+      );
+
+      setDistalMedialDistance(distalMedialDist);
+      setDistalLateralDistance(distalLateralDist);
+    }
+  }, [distalResectionPlane, placedPoints]);
   useEffect(() => {
     if (distalMedialPlane && flexionExtensionPlane) {
       const planeGeometry = new THREE.PlaneGeometry(5, 5);
@@ -437,10 +510,10 @@ const Experience = ({
     placedPoints,
     lateralLineLength,
   ]);
-
   const handleClick = () => {
     if (!isPointActive || resectionOn || !selectedPoint || !hoverPoint) return;
     onPointPlace(selectedPoint, hoverPoint);
+    setActivePoint(selectedPoint); // Add this line
   };
 
   return (
@@ -449,7 +522,50 @@ const Experience = ({
       <OrbitControls makeDefault />
       {/* <gridHelper />
       <axesHelper /> */}
+      {placedPoints["Distal Medial Pt"] && distalResectionPlane ? (
+        <Billboard
+          position={new THREE.Vector3().addVectors(
+            placedPoints["Distal Medial Pt"],
+            new THREE.Vector3(0.1, 1, 0)
+          )}
+        >
+          <Text fontSize={0.05} color="black" anchorX="left" anchorY="middle">
+            {distalMedialDistance !== null
+              ? `Distal Medial: ${(distalMedialDistance * 1000).toFixed(2)} mm`
+              : null}
+          </Text>
+        </Billboard>
+      ) : null}
 
+      {placedPoints["Distal Lateral Pt"] && (
+        <Billboard
+          position={new THREE.Vector3().addVectors(
+            placedPoints["Distal Lateral Pt"],
+            new THREE.Vector3(0.1, 1, 0.1)
+          )}
+        >
+          <Text fontSize={0.05} color="black" anchorX="left" anchorY="middle">
+            {distalLateralDistance !== null
+              ? `Distal Lateral: ${(distalLateralDistance * 1000).toFixed(
+                  2
+                )} mm`
+              : null}
+          </Text>
+        </Billboard>
+      )}
+      <mesh
+        geometry={bone2}
+        scale={0.01}
+        position={[0, -7, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        castShadow
+      >
+        <meshStandardMaterial
+          transparent
+          opacity={boneOpacity}
+          color={boneColor}
+        />
+      </mesh>
       <group key={resectionOn ? "resection" : "normal"}>
         {resectionOn && nodes.Right_Femur?.geometry ? (
           <mesh receiveShadow castShadow>
@@ -512,20 +628,36 @@ const Experience = ({
         </mesh>
       )}
 
-      {Object.entries(placedPoints).map(([point, position]) => (
-        <mesh key={point} position={position}>
-          <sphereGeometry args={[0.01, 32, 32]} />
-          <meshStandardMaterial color="red" />
-          {selectedPoint === point && (
-            <TransformControls
-              mode="translate"
-              onObjectChange={() => {
-                onPointPlace(point, position);
+      {Object.entries(placedPoints).map(([point, position]) => {
+        if (!meshRefs.current[point]) {
+          meshRefs.current[point] = React.createRef();
+        }
+        return (
+          <group key={point}>
+            <mesh
+              ref={meshRefs.current[point]}
+              position={position}
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePointClick(point);
               }}
-            />
-          )}
-        </mesh>
-      ))}
+            >
+              <sphereGeometry args={[0.01, 32, 32]} />
+              <meshStandardMaterial color={"red"} />
+            </mesh>
+            {activePoint === point && meshRefs.current[point].current && (
+              <TransformControls
+                object={meshRefs.current[point].current}
+                mode="translate"
+                onObjectChange={(e) => {
+                  const newPosition = e.target.object.position;
+                  onPointPlace(point, newPosition);
+                }}
+              />
+            )}
+          </group>
+        );
+      })}
 
       {lateralLine && <Line points={lateralLine} color="white" lineWidth={5} />}
 
