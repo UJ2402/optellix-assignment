@@ -1,7 +1,8 @@
 # Optellix Assignment
 
 This project is a 3D visualization tool for orthopedic pre-operative planning, focusing on femur and tibia bone models.
-
+DEMO :-
+https://optellix-assignment-six.vercel.app/
 ## Features
 
 - Interactive 3D bone model visualization
