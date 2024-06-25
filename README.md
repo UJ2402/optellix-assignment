@@ -1,4 +1,4 @@
-# XYZ Assignment
+# Optellix Assignment
 
 This project is a 3D visualization tool for orthopedic pre-operative planning, focusing on femur and tibia bone models.
 
