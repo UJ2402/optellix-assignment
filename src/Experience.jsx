@@ -72,6 +72,7 @@ const Experience = ({
     setActivePoint(point);
     onPointPlace(point, placedPoints[point]); 
   };
+  const [isTransformControlActive, setIsTransformControlActive] = useState(false);
   const { boneOpacity, boneColor, anteriorLineLength, lateralLineLength, showBone2 } =
   useControls("Bone Model", {
     boneOpacity: { value: 0.5, min: 0, max: 1, step: 0.1 },
@@ -215,7 +216,7 @@ const Experience = ({
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const handleMouseMove = (event) => {
-      if (!isPointActive || resectionOn ) {
+      if (!isPointActive || resectionOn || isTransformControlActive) {
         setHoverPoint(null);
         return;
       }
@@ -245,8 +246,7 @@ const Experience = ({
       window.removeEventListener("mousemove", handleMouseMove);
     };
     console.log(hello)
-  }, [camera, gl.domElement, isPointActive, resectionOn]);
-
+  }, [camera, gl.domElement, isPointActive, resectionOn, isTransformControlActive]);
   useEffect(() => {
     if (updateClicked && placedPoints) {
       const linesToCreate = [
@@ -649,17 +649,17 @@ const Experience = ({
               <meshStandardMaterial color={"red"} />
             </mesh>
             {activePoint === point && meshRefs.current[point].current && (
-             <TransformControls
-             object={meshRefs.current[point].current}
-             mode="translate"
-             onObjectChange={(e) => {
-               const newPosition = e.target.object.position;
-               onPointPlace(point, newPosition);
-             }}
-             onMouseDown={() => setIsTransformControlActive(true)}
-             onMouseUp={() => setIsTransformControlActive(false)}
-           />
-            )}
+  <TransformControls
+    object={meshRefs.current[point].current}
+    mode="translate"
+    onObjectChange={(e) => {
+      const newPosition = e.target.object.position;
+      onPointPlace(point, newPosition);
+    }}
+    onMouseDown={() => setIsTransformControlActive(true)}
+    onMouseUp={() => setIsTransformControlActive(false)}
+  />
+)}
           </group>
         );
       })}
