@@ -12,7 +12,7 @@ import * as THREE from "three";
 import { Text } from "@react-three/drei";
 import { Perf } from "r3f-perf";
 import { Addition, Base, Geometry, Subtraction } from "@react-three/csg";
-    import { useControls } from "leva";
+import { useControls } from "leva";
 import { createCuttingGeometry } from "./cuttingGeometry";
 
 const calculatePerpendicularVector = (v1, v2, planeNormal) => {
@@ -66,15 +66,21 @@ const Experience = ({
   const [distalMedialDistance, setDistalMedialDistance] = useState(null);
   const [distalLateralDistance, setDistalLateralDistance] = useState(null);
   const [bone2Visible, setBone2Visible] = useState(true);
- 
+
   const meshRefs = useRef({});
   const handlePointClick = (point) => {
     setActivePoint(point);
-    onPointPlace(point, placedPoints[point]); 
+    onPointPlace(point, placedPoints[point]);
   };
-  const [isTransformControlActive, setIsTransformControlActive] = useState(false);
-  const { boneOpacity, boneColor, anteriorLineLength, lateralLineLength, showBone2 } =
-  useControls("Bone Model", {
+  const [isTransformControlActive, setIsTransformControlActive] =
+    useState(false);
+  const {
+    boneOpacity,
+    boneColor,
+    anteriorLineLength,
+    lateralLineLength,
+    showBone2,
+  } = useControls("Bone Model", {
     boneOpacity: { value: 0.5, min: 0, max: 1, step: 0.1 },
     boneColor: "orange",
     anteriorLineLength: { value: 10.0, min: 10.0, max: 100.0, step: 0.5 },
@@ -154,7 +160,6 @@ const Experience = ({
         normal.multiplyScalar(0.01 * distalResectionDistance)
       );
 
-      // Store the normal vector with the plane
       newDistalResectionPlane.userData.normal = normal;
 
       setDistalResectionPlane(newDistalResectionPlane);
@@ -203,7 +208,6 @@ const Experience = ({
         normal.multiplyScalar(0.01 * distalResectionDistance)
       );
 
-      // Store the normal vector with the plane
       newDistalResectionPlane.userData.normal = normal;
 
       setDistalResectionPlane(newDistalResectionPlane);
@@ -220,16 +224,16 @@ const Experience = ({
         setHoverPoint(null);
         return;
       }
-    
+
       const raycaster = new THREE.Raycaster();
       const mouse = new THREE.Vector2();
       const rect = gl.domElement.getBoundingClientRect();
       mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
       mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(mouse, camera);
-    
+
       const intersects = raycaster.intersectObject(femurRef.current);
-    
+
       if (intersects.length > 0) {
         const point = intersects[0].point;
         setHoverPoint(point);
@@ -245,8 +249,13 @@ const Experience = ({
     return () => {
       window.removeEventListener("mousemove", handleMouseMove);
     };
-    console.log(hello)
-  }, [camera, gl.domElement, isPointActive, resectionOn, isTransformControlActive]);
+  }, [
+    camera,
+    gl.domElement,
+    isPointActive,
+    resectionOn,
+    isTransformControlActive,
+  ]);
   useEffect(() => {
     if (updateClicked && placedPoints) {
       const linesToCreate = [
@@ -513,7 +522,7 @@ const Experience = ({
   const handleClick = () => {
     if (!isPointActive || resectionOn || !selectedPoint || !hoverPoint) return;
     onPointPlace(selectedPoint, hoverPoint);
-    setActivePoint(selectedPoint); 
+    setActivePoint(selectedPoint);
   };
 
   return (
@@ -554,20 +563,20 @@ const Experience = ({
         </Billboard>
       )}
       {bone2Visible && (
-  <mesh
-    geometry={bone2}
-    scale={0.01}
-    position={[0, -7, 0]}
-    rotation={[-Math.PI / 2, 0, 0]}
-    castShadow
-  >
-    <meshStandardMaterial
-      transparent
-      opacity={boneOpacity}
-      color={boneColor}
-    />
-  </mesh>
-)}
+        <mesh
+          geometry={bone2}
+          scale={0.01}
+          position={[0, -7, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          castShadow
+        >
+          <meshStandardMaterial
+            transparent
+            opacity={boneOpacity}
+            color={boneColor}
+          />
+        </mesh>
+      )}
 
       <group key={resectionOn ? "resection" : "normal"}>
         {resectionOn && nodes.Right_Femur?.geometry ? (
@@ -649,17 +658,17 @@ const Experience = ({
               <meshStandardMaterial color={"red"} />
             </mesh>
             {activePoint === point && meshRefs.current[point].current && (
-  <TransformControls
-    object={meshRefs.current[point].current}
-    mode="translate"
-    onObjectChange={(e) => {
-      const newPosition = e.target.object.position;
-      onPointPlace(point, newPosition);
-    }}
-    onMouseDown={() => setIsTransformControlActive(true)}
-    onMouseUp={() => setIsTransformControlActive(false)}
-  />
-)}
+              <TransformControls
+                object={meshRefs.current[point].current}
+                mode="translate"
+                onObjectChange={(e) => {
+                  const newPosition = e.target.object.position;
+                  onPointPlace(point, newPosition);
+                }}
+                onMouseDown={() => setIsTransformControlActive(true)}
+                onMouseUp={() => setIsTransformControlActive(false)}
+              />
+            )}
           </group>
         );
       })}

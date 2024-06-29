@@ -38,7 +38,7 @@ const handlePointSelect = (point) => {
   const newSelectedPoint = point === selectedPoint ? null : point;
   setSelectedPoint(newSelectedPoint);
   setIsPointActive(!!newSelectedPoint);
-  setActivePoint(newSelectedPoint); // Add this line
+  setActivePoint(newSelectedPoint); 
 };
 
   const handlePointPlace = (point, position) => {
@@ -60,11 +60,11 @@ const handlePointSelect = (point) => {
   };
 
   const handleVarusValgusRotation = (direction) => {
-    setVarusValgusAngle((prevAngle) => prevAngle + (direction * Math.PI) / 180); // Rotate by 1 degree
+    setVarusValgusAngle((prevAngle) => prevAngle + (direction * Math.PI) / 180);
   };
 
   const handleExtensionRotation = (direction) => {
-    setExtensionAngle((prevAngle) => prevAngle + (direction * Math.PI) / 180); // Rotate by 1 degree
+    setExtensionAngle((prevAngle) => prevAngle + (direction * Math.PI) / 180); 
   };
   const landmarks = [
     "Femur Center",
@@ -99,7 +99,7 @@ const handlePointSelect = (point) => {
       </div>
 
       <div className="main-content">
-        <Canvas camera={{ fov: 45, near: 0.1, far: 200000 }}>
+        <Canvas camera={{ fov: 45, near: 0.1, far: 2000 }}>
 
           <Experience
             selectedPoint={selectedPoint}
